@@ -41,11 +41,11 @@ func (r *Rabbit) InitializeQueue(queueName string) {
 	
 	queue, err := r.channel.QueueDeclare(
 		queueName, // name
-		false,    // durable
-		false,    // delete when unused
-		false,    // exclusive
-		false,    // no-wait
-		nil,      // arguments	
+		true,      // durable
+		false,     // delete when unused
+		false,     // exclusive
+		false,     // no-wait
+		nil,       // arguments	
 	)
 	failOnError(err, "Failed to declare a queue")
 	r.queue = &queue
@@ -58,6 +58,7 @@ func (r *Rabbit) PublishMesssage(message string) {
 		false,        // mandatory
 		false,        // immediate
 		amqp.Publishing {
+			DeliveryMode: amqp.Persistent,
 			ContentType: "application/json",
 			Body:        []byte(message),
 		})
@@ -82,6 +83,7 @@ func (r *Rabbit) ReceiveMessages(done chan string) {
 	go func() {
 		for d := range msgs {
 			done <- string(d.Body)
+			d.Ack(false)
 		}
 	}()
 	<- forever
