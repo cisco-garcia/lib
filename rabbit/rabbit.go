@@ -22,12 +22,35 @@ func failOnError(err error, msg string) {
 
 // TODO: Refactor into functions
 // TODO: Replace parameters with config file
+// TODO: Implement initializer
+// TODO: Implement destructoer for defer
+
+func (r *Rabbit) Initialize() {
+
+}
+
+func (r *Rabbit) Destroy() {
+
+}
 
 func (r *Rabbit) EstablishRabbitConnection() {
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	failOnError(err, "Failed to open a channel")
 
 	r.connection = conn
+}
+
+func (r *Rabbit) InitializeExchange() {
+	err = ch.ExchangeDeclare(
+		"logs",   // name
+		"direct", // type
+		true,     // durable
+		false,    // auto-deleted
+		false,    // internal
+		false,    // no-wait
+		nil,      // arguments
+	)
+	failOnError(err, "Failed to create an exchange")
 }
 
 func (r *Rabbit) InitializeChannel()  {
