@@ -11,6 +11,8 @@ type Rabbit struct {
 	connection *amqp.Connection
 	channel *amqp.Channel
 	queue *amqp.Queue
+	exchange_name *string
+	exchange_type *string
 }
 
 func failOnError(err error, msg string) {
@@ -23,7 +25,8 @@ func failOnError(err error, msg string) {
 // TODO: Refactor into functions
 // TODO: Replace parameters with config file
 // TODO: Implement initializer
-// TODO: Implement destructoer for defer
+// TODO: Implement destructer for defer
+// TODO: Make all methods except Constructor/Destructor private (non-exported)
 
 func (r *Rabbit) Initialize() {
 
@@ -40,24 +43,26 @@ func (r *Rabbit) EstablishRabbitConnection() {
 	r.connection = conn
 }
 
-func (r *Rabbit) InitializeExchange() {
-	err = ch.ExchangeDeclare(
-		"logs",   // name
-		"direct", // type
+func (r *Rabbit) InitializeChannel()  {
+	channel, err := r.connection.Channel()
+	failOnError(err, "Failed to open a channel")
+
+	r.channel = channel
+}
+
+func (r *Rabbit) InitializeExchange(exchange_name string, exchange_type string) {
+	err := r.channel.ExchangeDeclare(
+		exchange_name,   // name
+		exchange_type, // type
 		true,     // durable
 		false,    // auto-deleted
 		false,    // internal
 		false,    // no-wait
 		nil,      // arguments
 	)
+	r.exchange_name = &exchange_name
+	r.exchange_type = &exchange_type
 	failOnError(err, "Failed to create an exchange")
-}
-
-func (r *Rabbit) InitializeChannel()  {
-	channel, err := r.connection.Channel()
-	failOnError(err, "Failed to open a channel")
-
-	r.channel = channel
 }
 
 func (r *Rabbit) InitializeQueue(queueName string) {
@@ -72,6 +77,16 @@ func (r *Rabbit) InitializeQueue(queueName string) {
 	)
 	failOnError(err, "Failed to declare a queue")
 	r.queue = &queue
+}
+
+func (r *Rabbit) BindQueueToExchange() {
+	err := r.channel.QueueBind(
+		r.queue,		// queue name
+		"",			// routing key
+		r.exchange_name,	// exchange
+		false,
+		nil
+	)
 }
 
 func (r *Rabbit) PublishMesssage(message string) {
