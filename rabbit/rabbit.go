@@ -7,12 +7,13 @@ import (
 )
 
 type Rabbit struct {
-	hostname *string
+	hostname string
 	connection *amqp.Connection
 	channel *amqp.Channel
 	queue *amqp.Queue
-	exchange_name *string
-	exchange_type *string
+	exchange_name string
+	exchange_type string
+	queue_name string
 }
 
 func failOnError(err error, msg string) {
@@ -22,53 +23,59 @@ func failOnError(err error, msg string) {
 	}
 }
 
-// TODO: Refactor into functions
 // TODO: Replace parameters with config file
 // TODO: Implement initializer
 // TODO: Implement destructer for defer
 // TODO: Make all methods except Constructor/Destructor private (non-exported)
 
-func (r *Rabbit) Initialize() {
-
+func (r *Rabbit) Initialize(queue_name string, exchange_name string, exchange_type string) {
+	r.queue_name = queue_name
+	r.exchange_name = exchange_name
+	r.exchange_type = exchange_type
+	
+	r.establishRabbitConnection()
+	r.initializeChannel()
+	r.initializeQueue()
+	r.initializeExchange()
+	r.bindQueueToExchange()
 }
 
 func (r *Rabbit) Destroy() {
 
 }
 
-func (r *Rabbit) EstablishRabbitConnection() {
+func (r *Rabbit) establishRabbitConnection() {
+	// TODO - use actual configuration information
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	failOnError(err, "Failed to open a channel")
 
 	r.connection = conn
 }
 
-func (r *Rabbit) InitializeChannel()  {
+func (r *Rabbit) initializeChannel()  {
 	channel, err := r.connection.Channel()
 	failOnError(err, "Failed to open a channel")
 
 	r.channel = channel
 }
 
-func (r *Rabbit) InitializeExchange(exchange_name string, exchange_type string) {
+func (r *Rabbit) initializeExchange() {
 	err := r.channel.ExchangeDeclare(
-		exchange_name,   // name
-		exchange_type, // type
+		r.exchange_name,   // name
+		r.exchange_type, // type
 		true,     // durable
 		false,    // auto-deleted
 		false,    // internal
 		false,    // no-wait
 		nil,      // arguments
 	)
-	r.exchange_name = &exchange_name
-	r.exchange_type = &exchange_type
 	failOnError(err, "Failed to create an exchange")
 }
 
-func (r *Rabbit) InitializeQueue(queueName string) {
+func (r *Rabbit) initializeQueue() {
 	
 	queue, err := r.channel.QueueDeclare(
-		queueName, // name
+		r.queue_name, // name
 		true,      // durable
 		false,     // delete when unused
 		false,     // exclusive
@@ -79,22 +86,22 @@ func (r *Rabbit) InitializeQueue(queueName string) {
 	r.queue = &queue
 }
 
-func (r *Rabbit) BindQueueToExchange() {
+func (r *Rabbit) bindQueueToExchange() {
 	err := r.channel.QueueBind(
-		r.queue,		// queue name
+		r.queue_name,		// queue name
 		"",			// routing key
 		r.exchange_name,	// exchange
 		false,
-		nil
+		nil,
 	)
 }
 
 func (r *Rabbit) PublishMesssage(message string) {
 	err := r.channel.Publish(
-		"",           // exchange
-		r.queue.Name, // routing key
-		false,        // mandatory
-		false,        // immediate
+		r.exchange_name,        // exchange
+		r.queue_name,		// routing key
+		false,			// mandatory
+		false,			// immediate
 		amqp.Publishing {
 			DeliveryMode: amqp.Persistent,
 			ContentType: "application/json",
@@ -105,7 +112,7 @@ func (r *Rabbit) PublishMesssage(message string) {
 
 func (r *Rabbit) ReceiveMessages(done chan string) {
 	msgs, err := r.channel.Consume(
-		r.queue.Name, // queue
+		r.queue_name, // queue
 		"",           // consumer
 		true,         // auto-ack
 		false,        // exclusive
