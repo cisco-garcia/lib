@@ -94,6 +94,7 @@ func (r *Rabbit) bindQueueToExchange() {
 		false,
 		nil,
 	)
+	failOnError(err, "Failed to bind to an exchange")
 }
 
 func (r *Rabbit) PublishMesssage(message string) {
